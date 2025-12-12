@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Movie Finder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body {
+    margin: 0;
+    background: #0d0d0d;
+    font-family: Arial, sans-serif;
+    color: #fff;
+}
+header {
+    padding: 20px;
+    text-align: center;
+    background: #111;
+    border-bottom: 2px solid #ff0000;
+}
+header h1 {
+    margin: 0;
+    font-size: 28px;
+    color: #ff0000;
+}
+#searchBar {
+    width: 90%;
+    max-width: 450px;
+    padding: 12px 15px;
+    margin-top: 15px;
+    border-radius: 25px;
+    border: none;
+    font-size: 16px;
+}
+.movies {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    padding: 20px;
+}
+.movie {
+    background: #1b1b1b;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.movie:hover {
+    transform: scale(1.05);
+}
+.movie img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+}
+.movie h3 {
+    margin: 10px;
+    font-size: 14px;
+    text-align: center;
+}
+/* Popup */
+#popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+    overflow-y: auto;
+}
+#popupContent {
+    background: #111;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 600px;
+    width: 95%;
+    text-align: center;
+}
+#popupContent img, #popupContent video {
+    width: 100%;
+    border-radius: 10px;
+    max-height: 350px;
+    object-fit: cover;
+}
+#popupContent h2 {
+    margin-top: 10px;
+}
+button {
+    background: red;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #fff;
+    margin-top: 10px;
+    transition: background 0.2s;
+}
+button:hover {
+    background: darkred;
+}
+/* Review Stars */
+.stars {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+.star {
+    font-size: 26px;
+    color: gray;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.star.hover,
+.star.selected {
+    color: gold;
+}
+.review-card {
+    background: #222;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    text-align: left;
+}
+.review-card p {
+    margin: 5px 0 0 0;
+}
+@media (max-width: 480px){
+    .movie img {height:180px;}
+    #popupContent img, #popupContent video {max-height:250px;}
+    #searchBar {font-size:14px; padding:10px;}
+}
+textarea {
+    width:100%; 
+    height:80px; 
+    border-radius:8px; 
+    padding:10px; 
+    border:none; 
+    resize:none;
+}
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🎬 Movie Finder</h1>
+    <input id="searchBar" type="text" placeholder="Search movies...">
+</header>
+
+<div class="movies" id="moviesList"></div>
+
+<!-- Popup -->
+<div id="popup">
+    <div id="popupContent">
+        <div id="videoContainer" style="display:none;">
+            <video id="popupVideo" controls></video>
+        </div>
+        <img id="popupImage" src="">
+        <h2 id="popupTitle"></h2>
+        <p id="popupOverview"></p>
+
+        <h3 style="margin-top:15px;">Write a Review:</h3>
+        <div class="stars" id="starContainer">
+            <span class="star" data-value="1">&#9733;</span>
+            <span class="star" data-value="2">&#9733;</span>
+            <span class="star" data-value="3">&#9733;</span>
+            <span class="star" data-value="4">&#9733;</span>
+            <span class="star" data-value="5">&#9733;</span>
+        </div>
+        <textarea id="reviewInput" placeholder="Type your review..."></textarea>
+
+        <button id="submitReview">Submit Review</button>
+
+        <h3 style="margin-top:15px;">Reviews:</h3>
+        <div id="reviewsList" style="text-align:left; max-height:200px; overflow-y:auto;"></div>
+
+        <button id="downloadBtn">Download Poster</button>
+        <button id="closePopup">Close</button>
+    </div>
+</div>
+
+<script>
+const API_KEY = "5eea6635056a2db7d17d0c2aa260abad";
+const BASE_URL = "https://api.themoviedb.org/3";
+const IMG = "https://image.tmdb.org/t/p/w500";
+
+const moviesList = document.getElementById("moviesList");
+const searchBar = document.getElementById("searchBar");
+
+let currentMovie = null;
+let selectedRating = 0;
+
+// Map movie IDs to streaming URLs (replace with your own hosted legal MP4 links)
+const movieStreams = {
+    550: "https://example.com/movies/fightclub.mp4",
+    680: "https://example.com/movies/pulpfiction.mp4"
+};
+
+// Stars
+const stars = document.querySelectorAll(".star");
+stars.forEach(star => {
+    star.addEventListener("mouseover", () => {
+        stars.forEach(s => s.classList.remove("hover"));
+        let val = parseInt(star.dataset.value);
+        stars.forEach(s => { if(parseInt(s.dataset.value) <= val) s.classList.add("hover"); });
+    });
+    star.addEventListener("mouseout", () => {
+        stars.forEach(s => s.classList.remove("hover"));
+    });
+    star.addEventListener("click", () => {
+        selectedRating = parseInt(star.dataset.value);
+        updateStars();
+    });
+});
+function updateStars() {
+    stars.forEach(star => {
+        if(parseInt(star.dataset.value) <= selectedRating) star.classList.add("selected");
+        else star.classList.remove("selected");
+    });
+}
+
+async function fetchMovies(url) {
+    const res = await fetch(url);
+    const data = await res.json();
+    showMovies(data.results);
+}
+
+function showMovies(movies) {
+    moviesList.innerHTML = "";
+    movies.forEach(m => {
+        const div = document.createElement("div");
+        div.classList.add("movie");
+        div.innerHTML = `<img src="${m.poster_path ? IMG+m.poster_path : ''}"><h3>${m.title}</h3>`;
+        div.onclick = () => openPopup(m);
+        moviesList.appendChild(div);
+    });
+}
+
+function openPopup(movie) {
+    currentMovie = movie;
+    document.getElementById("popup").style.display = "flex";
+
+    const posterURL = IMG+movie.poster_path;
+    const streamURL = movieStreams[movie.id];
+
+    const videoContainer = document.getElementById("videoContainer");
+    const videoEl = document.getElementById("popupVideo");
+    const imgEl = document.getElementById("popupImage");
+
+    if(streamURL){
+        videoContainer.style.display = "block";
+        imgEl.style.display = "none";
+        videoEl.src = streamURL;
+        videoEl.load();
+    } else {
+        videoContainer.style.display = "none";
+        imgEl.style.display = "block";
+        imgEl.src = posterURL;
+    }
+
+    document.getElementById("popupTitle").innerText = movie.title;
+    document.getElementById("popupOverview").innerText = movie.overview || "No description available.";
+
+    selectedRating = 0;
+    updateStars();
+    document.getElementById("reviewInput").value = "";
+    loadReviews(movie.id);
+
+    document.getElementById("downloadBtn").onclick = () => {
+        const link = document.createElement("a");
+        link.href = posterURL;
+        link.download = `${movie.title.replace(/[^a-z0-9]/gi,"_")}_poster.jpg`;
+        link.click();
+    };
+
+    document.getElementById("submitReview").onclick = () => {
+        const reviewText = document.getElementById("reviewInput").value.trim();
+        if(reviewText === "" && selectedRating===0) return alert("Add review text or star rating.");
+        saveReview(movie.id, reviewText, selectedRating);
+        document.getElementById("reviewInput").value = "";
+        selectedRating=0;
+        updateStars();
+        loadReviews(movie.id);
+    };
+}
+
+document.getElementById("closePopup").onclick = () => {
+    document.getElementById("popup").style.display = "none";
+};
+
+searchBar.addEventListener("keyup", () => {
+    const query = searchBar.value.trim();
+    if(query.length>1) fetchMovies(`${BASE_URL}/search/movie?api_key=${API_KEY}&query=${query}`);
+});
+
+fetchMovies(`${BASE_URL}/trending/movie/week?api_key=${API_KEY}`);
+
+function saveReview(movieId,text,rating){
+    let reviews = JSON.parse(localStorage.getItem("reviews"))||{};
+    if(!reviews[movieId]) reviews[movieId]=[];
+    reviews[movieId].push({text,rating,date:new Date().toLocaleString()});
+    localStorage.setItem("reviews",JSON.stringify(reviews));
+}
+
+function loadReviews(movieId){
+    const reviews = JSON.parse(localStorage.getItem("reviews"))||{};
+    const list = document.getElementById("reviewsList");
+    list.innerHTML="";
+    if(!reviews[movieId]||reviews[movieId].length===0){
+        list.innerHTML="<p>No reviews yet.</p>";
+        return;
+    }
+    reviews[movieId].forEach(r=>{
+        const div=document.createElement("div");
+        div.classList.add("review-card");
+        let starsHtml="";
+        for(let i=1;i<=5;i++) starsHtml+=i<=r.rating?"&#9733;":"&#9734;";
+        div.innerHTML=`<div style="color:gold;">${starsHtml}</div>
+        <p>${r.text}</p>
+        <small style="color:#ccc;">${r.date}</small>`;
+        list.appendChild(div);
+    });
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gemini-style — Dark Mode</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+  :root{
+    --bg:#0b0f13;
+    --panel:#0f1720;
+    --muted:#94a3b8;
+    --user:#0e1114;
+    --ai:#0f6fff;
+    --bubble-user:#111418;
+    --bubble-ai:#0e6fff;
+  }
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+    background:linear-gradient(180deg,#06070a 0%,var(--bg) 100%);
+    color:#e6eef8;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+
+  /* Container */
+  .app {
+    width:100%;
+    max-width:920px;
+    height:88vh;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius:16px;
+    box-shadow: 0 10px 30px rgba(2,6,23,0.7);
+    overflow: hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* Header */
+  .header{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:18px 20px;
+    border-bottom:1px solid rgba(255,255,255,0.03);
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  }
+  .logo {
+    width:46px;height:46px;border-radius:10px;
+    background:linear-gradient(135deg,var(--ai),#8fb8ff);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:#02102a;
+    box-shadow:0 6px 18px rgba(14,111,255,0.12), inset 0 -6px 14px rgba(255,255,255,0.06);
+  }
+  .title{
+    font-size:16px;font-weight:600;color:#ffffff;
+  }
+  .subtitle{font-size:12px;color:var(--muted)}
+
+  /* Chat area */
+  .chat{
+    flex:1;
+    padding:18px;
+    overflow:auto;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    scroll-behavior:smooth;
+  }
+
+  /* input row */
+  .composer{
+    display:flex;
+    gap:12px;
+    padding:14px;
+    border-top:1px solid rgba(255,255,255,0.02);
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    align-items:center;
+  }
+
+  .input {
+    flex:1;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+    padding:8px 12px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.03);
+  }
+
+  .text {
+    flex:1;
+    background:transparent;
+    border:0;
+    outline:0;
+    color:#e6eef8;
+    font-size:15px;
+    padding:8px 6px;
+  }
+
+  .sendBtn {
+    background:linear-gradient(180deg,var(--ai),#659cff);
+    border:0;color:#02102a;padding:10px 14px;border-radius:10px;font-weight:600;
+    box-shadow:0 8px 20px rgba(14,111,255,0.12);
+    cursor:pointer;
+  }
+  .sendBtn:disabled{opacity:0.5;cursor:not-allowed}
+
+  /* mic */
+  .mic {
+    width:46px;height:46px;border-radius:999px;background:#071025;display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,255,255,0.03);cursor:pointer;
+  }
+  .mic.listening{ box-shadow:0 0 0 6px rgba(14,111,255,0.08), 0 8px 30px rgba(14,111,255,0.06); background:linear-gradient(180deg,#ef4444,#dc2626) }
+
+  /* bubbles */
+  .bubble {
+    max-width:78%;
+    padding:12px 14px;
+    border-radius:14px;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+    line-height:1.4;
+    word-wrap:break-word;
+    animation: fadeIn 180ms ease;
+  }
+  .row { display:flex; gap:10px; align-items:flex-end; }
+  .row.user { justify-content:flex-end; }
+  .row.ai { justify-content:flex-start; }
+
+  .bubble.user {
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border:1px solid rgba(255,255,255,0.03);
+    color:#e6eef8;
+    border-bottom-right-radius:4px;
+  }
+  .bubble.ai {
+    background:linear-gradient(180deg, var(--bubble-ai), #5a97ff);
+    color:#02102a;
+    border-bottom-left-radius:4px;
+  }
+
+  .meta{
+    font-size:11px;color:var(--muted);margin-top:6px;
+  }
+
+  /* typing indicator (three dots) */
+  .typing {
+    display:inline-flex;
+    gap:6px;
+    align-items:center;
+    padding:8px 12px;
+    border-radius:14px;
+    background:rgba(255,255,255,0.03);
+    color:var(--muted);
+  }
+  .dot {
+    width:8px;height:8px;border-radius:50%;background:#cbd5e1;opacity:0.6;
+    transform:translateY(0);
+    animation: bounce 1s infinite;
+  }
+  .dot:nth-child(2){ animation-delay:0.12s }
+  .dot:nth-child(3){ animation-delay:0.24s }
+
+  @keyframes bounce {
+    0%{ transform:translateY(0); opacity:.35 }
+    50%{ transform:translateY(-6px); opacity:1 }
+    100%{ transform:translateY(0); opacity:.35 }
+  }
+
+  @keyframes fadeIn { from {opacity:0; transform: translateY(6px)} to {opacity:1; transform:none} }
+
+  /* responsive */
+  @media (max-width:640px){
+    .app{ height:94vh; padding:0 }
+    .chat{ padding:12px }
+    .header{ padding:12px }
+  }
+</style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Gemini style chat — dark mode">
+    <header class="header">
+      <div class="logo">G</div>
+      <div>
+        <div class="title">Gemini — Dark</div>
+        <div class="subtitle">Type or speak. Press Enter to send.</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+        <div id="status" class="subtitle" style="font-size:13px;color:var(--muted)">Ready</div>
+      </div>
+    </header>
+
+    <main id="chat" class="chat" aria-live="polite"></main>
+
+    <div class="composer">
+      <div class="input" role="search">
+        <input id="textInput" class="text" placeholder="Ask something..." autocomplete="off" autofocus />
+        <button id="sendBtn" class="sendBtn">Send</button>
+      </div>
+
+      <div id="micBtn" class="mic" title="Toggle microphone (voice)">
+        <!-- microphone icon -->
+        <svg id="micSvg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z" fill="#9fb7ff"></path>
+          <path d="M19 11v1a7 7 0 0 1-14 0v-1" stroke="rgba(255,255,255,0.06)" stroke-width="1.2"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------------- CONFIG (your API key inserted) ---------------- */
+const GEMINI_API_KEY = "AIzaSyD42_jX7sDkDBQaZiYqiz_R7ZuL65ykY3Q"; // <-- your key
+const MODEL = "gemini-2.5-flash";
+const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+/* ---------------- UI refs ---------------- */
+const chatEl = document.getElementById('chat');
+const textInput = document.getElementById('textInput');
+const sendBtn = document.getElementById('sendBtn');
+const micBtn = document.getElementById('micBtn');
+const statusEl = document.getElementById('status');
+
+/* ---------------- state ---------------- */
+let chatHistory = []; // {sender:'user'|'ai', text:''}
+let recognition = null;
+let listening = false;
+let aiThinking = false;
+let speaking = false;
+let typingIndicatorEl = null;
+
+/* ---------------- helpers ---------------- */
+function updateStatus(text) { statusEl.textContent = text; }
+function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
+
+function addMessage(text, sender){
+  const row = document.createElement('div');
+  row.className = 'row ' + (sender === 'user' ? 'user' : 'ai');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (sender === 'user' ? 'user' : 'ai');
+  bubble.textContent = text;
+  row.appendChild(bubble);
+  chatEl.appendChild(row);
+  scrollToBottom();
+}
+
+/* typing indicator */
+function showTyping(){
+  if(typingIndicatorEl) return;
+  typingIndicatorEl = document.createElement('div');
+  typingIndicatorEl.className = 'row ai';
+  const wrap = document.createElement('div');
+  wrap.className = 'typing';
+  const d1 = document.createElement('div'); d1.className='dot';
+  const d2 = document.createElement('div'); d2.className='dot';
+  const d3 = document.createElement('div'); d3.className='dot';
+  wrap.appendChild(d1); wrap.appendChild(d2); wrap.appendChild(d3);
+  typingIndicatorEl.appendChild(wrap);
+  chatEl.appendChild(typingIndicatorEl);
+  scrollToBottom();
+}
+function hideTyping(){
+  if(!typingIndicatorEl) return;
+  chatEl.removeChild(typingIndicatorEl);
+  typingIndicatorEl = null;
+}
+
+/* format history for Gemini */
+function formatHistory(){
+  // pass the whole conversation; Gemini expects "contents" with role+parts
+  return chatHistory.map(m => ({
+    role: m.sender === 'user' ? 'user' : 'model',
+    parts: [{ text: m.text }]
+  }));
+}
+
+/* ---------------- Gemini call ---------------- */
+async function callGemini(userText){
+  // push user
+  chatHistory.push({ sender:'user', text: userText });
+  addMessage(userText, 'user');
+
+  aiThinking = true;
+  updateStatus('Gemini is thinking…');
+  showTyping();
+
+  try{
+    const body = { contents: formatHistory() };
+    const res = await fetch(ENDPOINT, {
+      method:'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      const txt = await res.text();
+      console.error('API error', res.status, txt);
+      addMessage('Error: could not get reply. Check API key & quota.', 'ai');
+      return;
+    }
+    const data = await res.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a response.";
+    chatHistory.push({ sender:'ai', text: reply });
+    hideTyping();
+    addMessage(reply, 'ai');
+    speak(reply);
+  } catch(err){
+    console.error('Request failed', err);
+    hideTyping();
+    addMessage('Network/API request failed. See console.', 'ai');
+  } finally {
+    aiThinking = false;
+    updateStatus('Ready');
+  }
+}
+
+/* ---------------- Text send ---------------- */
+async function sendText(){
+  const v = textInput.value.trim();
+  if(!v) return;
+  textInput.value = '';
+  await callGemini(v);
+}
+sendBtn.addEventListener('click', sendText);
+textInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendText();
+  }
+});
+
+/* ---------------- Speech recognition (voice) ---------------- */
+function initSpeech(){
+  if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    // not supported
+    micBtn.style.opacity = 0.6;
+    micBtn.title = "Speech recognition not supported in this browser";
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = ()=>{ listening = true; micBtn.classList.add('listening'); updateStatus('Listening...'); }
+  recognition.onerror = (ev)=>{ console.error('Recognition error', ev); updateStatus('Recognition error'); listening=false; micBtn.classList.remove('listening'); }
+  recognition.onend = ()=>{ listening = false; micBtn.classList.remove('listening'); updateStatus('Ready'); }
+  recognition.onresult = (ev)=>{
+    const transcript = ev.results[0][0].transcript;
+    // auto-send
+    callGemini(transcript);
+  };
+}
+micBtn.addEventListener('click', ()=>{
+  if(!recognition) return;
+  if(listening) recognition.stop();
+  else recognition.start();
+});
+
+/* ---------------- Speech synthesis ---------------- */
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    if(speaking) window.speechSynthesis.cancel();
+    speaking = true;
+    updateStatus('Speaking…');
+    const u = new SpeechSynthesisUtterance(text);
+    u.onend = ()=>{ speaking = false; updateStatus('Ready'); };
+    u.onerror = ()=>{ speaking = false; updateStatus('Ready'); };
+    window.speechSynthesis.speak(u);
+  }catch(e){
+    console.error('TTS error', e);
+    speaking = false;
+    updateStatus('Ready');
+  }
+}
+
+/* ---------------- init ---------------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  initSpeech();
+  updateStatus('Ready');
+  // welcome message
+  const welcome = "Hello! This is a Gemini-style dark chat. Type or tap the mic to speak.";
+  chatHistory.push({sender:'ai', text: welcome});
+  addMessage(welcome, 'ai');
+  // focus
+  textInput.focus();
+});
+</script>
+</body>
+</html>
